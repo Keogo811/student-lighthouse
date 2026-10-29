@@ -1,6 +1,7 @@
 """Load and clean the raw dataset."""
 import pandas as pd
 from pathlib import Path
+from sklearn.model_selection import train_test_split
 from lighthouse.config import load_config
 
 class DatasetLoader:
@@ -12,7 +13,7 @@ class DatasetLoader:
 
     def load_and_clean(self) -> pd.DataFrame:
         """Read CSV, remove leakage, and convert target to binary."""
-        # Le fichier de l'UCI utilise des points-virgules, pas des virgules
+        # Le fichier de l'UCI utilise des points-virgules
         df = pd.read_csv(self.raw_path, sep=";")
         
         # 1. Supprimer les colonnes du semestre 2 (fuite temporelle)
@@ -26,3 +27,19 @@ class DatasetLoader:
         df = df.drop(columns=["Target"])
         
         return df
+
+    def split(self, df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+        """Split data into train and test sets with stratification."""
+        X = df.drop(columns=["target"])
+        y = df["target"]
+        
+        # On utilise les valeurs de config.yaml
+        test_size = self.config["split"]["test_size"]
+        seed = self.config["seed"]
+        
+        return train_test_split(
+            X, y, 
+            test_size=test_size, 
+            stratify=y, 
+            random_state=seed
+        )
