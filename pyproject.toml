@@ -19,6 +19,9 @@ dependencies = [
 [project.optional-dependencies]
 app = ["streamlit>=1.30", "matplotlib>=3.7"]
 
+[project.scripts]
+lighthouse = "lighthouse.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
