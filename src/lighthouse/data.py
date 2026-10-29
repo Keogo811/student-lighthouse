@@ -16,14 +16,17 @@ class DatasetLoader:
         # Le fichier de l'UCI utilise des points-virgules
         df = pd.read_csv(self.raw_path, sep=";")
         
-        # 1. Supprimer les colonnes du semestre 2 (fuite temporelle)
+        # 1. Nettoyer les noms de colonnes (enlève les tabulations/espaces invisibles)
+        df.columns = df.columns.str.strip()
+        
+        # 2. Supprimer les colonnes du semestre 2 (fuite temporelle)
         cols_to_drop = [col for col in df.columns if "2nd sem" in col]
         df = df.drop(columns=cols_to_drop)
         
-        # 2. Mapping de la cible : Dropout = 1, le reste = 0
+        # 3. Mapping de la cible : Dropout = 1, le reste = 0
         df["target"] = df["Target"].apply(lambda x: 1 if x == "Dropout" else 0)
         
-        # 3. Supprimer l'ancienne colonne cible (texte)
+        # 4. Supprimer l'ancienne colonne cible (texte)
         df = df.drop(columns=["Target"])
         
         return df
