@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+src/lighthouse/__init__.py
+src/lighthouse/config.py
+src/lighthouse.egg-info/PKG-INFO
+src/lighthouse.egg-info/SOURCES.txt
+src/lighthouse.egg-info/dependency_links.txt
+src/lighthouse.egg-info/requires.txt
+src/lighthouse.egg-info/top_level.txt
+tests/test_smoke.py

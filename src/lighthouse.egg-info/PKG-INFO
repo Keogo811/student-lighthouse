@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: lighthouse
+Version: 0.1.0
+Summary: Student dropout risk prediction tool
+Requires-Python: >=3.10
+Requires-Dist: pandas>=2.0
+Requires-Dist: numpy>=1.24
+Requires-Dist: scikit-learn>=1.3
+Requires-Dist: joblib>=1.3
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: pytest>=7.4
+Provides-Extra: app
+Requires-Dist: streamlit>=1.30; extra == "app"
+Requires-Dist: matplotlib>=3.7; extra == "app"

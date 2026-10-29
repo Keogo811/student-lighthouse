@@ -1,0 +1,7 @@
+seed: 42
+paths:
+  raw_data: data/raw/students_dropout.csv
+  models_dir: models
+split:
+  test_size: 0.2
+  stratify_on: target
