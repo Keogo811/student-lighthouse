@@ -94,3 +94,27 @@ class Trainer:
             "best_params": best_params,
             "best_estimator": grid.best_estimator_
         }
+        
+    def calculate_threshold(self, X: pd.DataFrame, y: pd.Series, capacity: int = 200) -> float:
+        """Calculate the decision threshold to select the top N students."""
+        from sklearn.model_selection import cross_val_predict
+        
+        # On utilise le meilleur modèle trouvé (LogReg avec C=1.0)
+        best_model = LogisticRegression(random_state=42, class_weight="balanced", max_iter=1000, C=1.0)
+        pipeline = self.build_pipeline(best_model)
+        
+        # On récupère les probabilités hors-pli (out-of-fold) pour le train set
+        # Cela simule ce qui se passera sur de nouvelles données sans toucher au test set
+        probs = cross_val_predict(pipeline, X, y, cv=5, method="predict_proba", n_jobs=-1)[:, 1]
+        
+        # On trie les probabilités de la plus haute à la plus basse
+        sorted_probs = sorted(probs, reverse=True)
+        
+        # Le seuil est la probabilité du 200ème étudiant
+        if len(sorted_probs) >= capacity:
+            threshold = float(sorted_probs[capacity - 1])
+        else:
+            threshold = 0.5 # Sécurité si le dataset est trop petit
+            
+        print(f"Seuil pour contacter {capacity} étudiants : {threshold:.4f}")
+        return threshold
