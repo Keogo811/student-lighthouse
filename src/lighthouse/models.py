@@ -4,19 +4,17 @@ from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import LinearSVC
-from sklearn.model_selection import cross_validate
+from sklearn.model_selection import cross_validate, GridSearchCV
 from lighthouse.features import build_preprocessor
 
 class Trainer:
     """Builds, trains, and evaluates scikit-learn pipelines."""
 
     def __init__(self) -> None:
-        # On prépare le transformateur de colonnes
         self.preprocessor = build_preprocessor()
 
     def build_pipeline(self, model) -> Pipeline:
         """Create a full pipeline with preprocessing and a model."""
-        # Le pipeline garantit qu'il n'y a pas de fuite de données
         return Pipeline(steps=[
             ("preprocessor", self.preprocessor),
             ("model", model)
@@ -24,17 +22,14 @@ class Trainer:
 
     def fit(self, X_train: pd.DataFrame, y_train: pd.Series, model=None) -> Pipeline:
         """Fit the pipeline on the training data."""
-        # Si aucun modèle n'est fourni, on utilise la Régression Logistique par défaut
         if model is None:
-            model = LogisticRegression(random_state=42, class_weight="balanced")
-            
+            model = LogisticRegression(random_state=42, class_weight="balanced", max_iter=1000)
         pipeline = self.build_pipeline(model)
         pipeline.fit(X_train, y_train)
         return pipeline
 
     def compare_models(self, X: pd.DataFrame, y: pd.Series) -> dict:
         """Compare 3 models using cross-validation and return their scores."""
-        # On définit nos 3 modèles de base
         models = {
             "Logistic Regression": LogisticRegression(random_state=42, class_weight="balanced", max_iter=1000),
             "k-NN": KNeighborsClassifier(n_neighbors=5),
@@ -42,24 +37,60 @@ class Trainer:
         }
         
         results = {}
-        
-        # On teste chaque modèle avec une validation croisée (5 folds)
         for name, model in models.items():
             pipeline = self.build_pipeline(model)
-            
-            # On utilise l'Average Precision (gère bien les classes déséquilibrées)
-            cv_results = cross_validate(
-                pipeline, X, y, 
-                cv=5, 
-                scoring="average_precision",
-                n_jobs=-1 # Utilise tous les cœurs du processeur
-            )
-            
-            # On garde la moyenne et l'écart-type
-            mean_score = cv_results["test_score"].mean()
-            std_score = cv_results["test_score"].std()
-            
-            results[name] = {"mean": mean_score, "std": std_score}
-            print(f"{name}: {mean_score:.4f} (+/- {std_score:.4f})")
-            
+            cv_results = cross_validate(pipeline, X, y, cv=5, scoring="average_precision", n_jobs=-1)
+            results[name] = {"mean": cv_results["test_score"].mean(), "std": cv_results["test_score"].std()}
         return results
+
+    def tune_and_select(self, X: pd.DataFrame, y: pd.Series) -> dict:
+        """Tune hyperparameters with GridSearchCV and select the best model."""
+        # 1. On définit les modèles et leurs grilles d'hyperparamètres
+        model_grids = {
+            "Logistic Regression": {
+                "model": LogisticRegression(random_state=42, class_weight="balanced", max_iter=1000),
+                "params": {"model__C": [0.1, 1.0, 10.0]} # C = force de régularisation
+            },
+            "k-NN": {
+                "model": KNeighborsClassifier(),
+                "params": {"model__n_neighbors": [3, 5, 7, 11]} # Nombre de voisins
+            },
+            "Linear SVM": {
+                "model": LinearSVC(random_state=42, class_weight="balanced"),
+                "params": {"model__C": [0.1, 1.0, 10.0]}
+            }
+        }
+        
+        best_name = ""
+        best_score = -1.0
+        best_params = {}
+        
+        # 2. On fait le GridSearch pour chaque modèle
+        for name, config in model_grids.items():
+            pipeline = self.build_pipeline(config["model"])
+            
+            grid = GridSearchCV(
+                pipeline, 
+                config["params"], 
+                cv=5, 
+                scoring="average_precision", 
+                n_jobs=-1
+            )
+            grid.fit(X, y)
+            
+            print(f"{name} : Meilleur score = {grid.best_score_:.4f} | Params = {grid.best_params_}")
+            
+            # 3. On garde le meilleur modèle global
+            if grid.best_score_ > best_score:
+                best_score = grid.best_score_
+                best_name = name
+                best_params = grid.best_params_
+                
+        print(f"\n--> Modèle retenu : {best_name} (Score : {best_score:.4f})")
+        
+        return {
+            "best_name": best_name,
+            "best_score": best_score,
+            "best_params": best_params,
+            "best_estimator": grid.best_estimator_
+        }
