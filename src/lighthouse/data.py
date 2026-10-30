@@ -2,14 +2,17 @@
 import pandas as pd
 from pathlib import Path
 from sklearn.model_selection import train_test_split
-from lighthouse.config import load_config
+from lighthouse.config import load_config, PROJECT_ROOT
 
 class DatasetLoader:
     """Loads the CSV, drops the semester 2 columns, and maps the target."""
 
     def __init__(self) -> None:
         self.config = load_config()
-        self.raw_path = Path(self.config["paths"]["raw_data"])
+        # On récupère le chemin depuis la config
+        raw_path = Path(self.config["paths"]["raw_data"])
+        # Si le chemin est relatif, on le rattache à la racine du projet
+        self.raw_path = raw_path if raw_path.is_absolute() else PROJECT_ROOT / raw_path
 
     def load_and_clean(self) -> pd.DataFrame:
         """Read CSV, remove leakage, and convert target to binary."""
