@@ -1,4 +1,4 @@
-"""Tests written by Pierre to verify model outputs."""
+"""Tests to verify model outputs."""
 from lighthouse.data import DatasetLoader
 from lighthouse.models import Trainer
 
