@@ -156,6 +156,29 @@ with tab1:
     </div>
     """, unsafe_allow_html=True)
 
+    st.divider()
+    st.subheader(f"📋 Triage List (Top {capacity} students to call)")
+    st.markdown("Here is the actual list of students the advisor should contact, ranked by risk.")
+    
+    # On crée un DataFrame avec les prédictions sur le test set (qui simule une nouvelle cohorte)
+    probs_test = model.predict_proba(X_test)[:, 1]
+    
+    # On crée un tableau temporaire
+    triage_df = pd.DataFrame({
+        "Student ID": X_test.index,
+        "Risk Score": probs_test,
+        "Actual Dropout": y_test
+    })
+    
+    # On trie par risque décroissant et on garde le top (capacity)
+    triage_df = triage_df.sort_values("Risk Score", ascending=False).head(capacity)
+    
+    # On formate la colonne Risk en pourcentage
+    triage_df["Risk Score"] = triage_df["Risk Score"].apply(lambda x: f"{x:.1%}")
+    
+    # On affiche le tableau interactif
+    st.dataframe(triage_df, use_container_width=True, hide_index=True)
+
 # ==========================================
 # ONGLET 2 : MODEL LAB
 # ==========================================

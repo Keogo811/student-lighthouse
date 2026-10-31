@@ -42,6 +42,8 @@ lighthouse predict --input new_case.json
 
 streamlit run src/lighthouse/app.py
 
+(Requires the [app] optional dependencies)
+
 ## Run the tests
 
 pytest
@@ -57,6 +59,8 @@ models/ : Where the trained model is saved.
 tests/ : Unit tests (cleaning, split, no leakage, CLI, etc.).
 
 DECISIONS.md : Records of all trade-offs made during the project.
+
+src/lighthouse/app.py : Streamlit dashboard (Triage simulator, Model Lab, Methodology).
 
 ## Credits
 

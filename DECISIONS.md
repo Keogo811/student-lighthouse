@@ -26,3 +26,8 @@ This file records the trade-offs made during the project. Each choice lists the 
 - **Choice:** A dynamic threshold (0.9927) calculated to select exactly the top 200 students.
 - **Alternative:** Default threshold of 0.5.
 - **Reason:** 0.5 is arbitrary. Our threshold is based on real-world capacity (200 appointments per semester), making the tool directly actionable.
+
+## 6. Streamlit Dashboard
+- **Choice:** Build an interactive Streamlit interface for the defense and user demonstration.
+- **Alternative:** A simple HTML/CSS page.
+- **Reason:** Streamlit is 100% Python and so evaluated on this language, requires zero front-end code, and allows dynamic interactions (like the capacity slider) that directly illustrate our decision threshold concept to the jury.
