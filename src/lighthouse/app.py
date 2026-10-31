@@ -1,19 +1,72 @@
-"""Streamlit application for Student Lighthouse."""
+"""Interactive dashboard for Student Lighthouse."""
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
 import json
 import matplotlib.pyplot as plt
-from pathlib import Path
 from sklearn.metrics import roc_curve, precision_recall_curve, auc
+from sklearn.model_selection import cross_val_predict
 from lighthouse.data import DatasetLoader
 from lighthouse.config import load_config
+from lighthouse.predict import get_top_signals
 
-# Configuration de la page
+# --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Student Lighthouse", page_icon="🕯️", layout="wide")
 
-# On charge le modèle et les données une seule fois (pour que ce soit rapide)
+# --- CSS PERSONNALISÉ (Dark Mode & Glassmorphism) ---
+st.markdown("""
+<style>
+    /* Importation d'une police moderne */
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Space Grotesk', sans-serif;
+    }
+    
+    /* Fond sombre global */
+    .stApp {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
+    
+    /* Effet de verre dépoli (Glassmorphism) */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 25px;
+        margin: 10px 0;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+    
+    .glass-card-high { border-left: 6px solid #ff4b4b; }
+    .glass-card-low { border-left: 6px solid #00cc96; }
+    
+    .risk-title { margin-top: 0; font-size: 1.5rem; font-weight: 700; }
+    .risk-score { font-size: 3.5rem; font-weight: 700; margin: 0; line-height: 1.1; }
+    
+    /* Style des badges de signaux */
+    .signal-badge {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        padding: 8px 12px;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        margin-right: 8px;
+        margin-bottom: 8px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# --- CHARGEMENT DES DONNÉES ---
 @st.cache_resource
 def load_model():
     config = load_config()
@@ -26,96 +79,124 @@ def load_data():
     df = loader.load_and_clean()
     return loader.split(df)
 
-# On récupère les éléments
 model = load_model()
 X_train, X_test, y_train, y_test = load_data()
 
 # --- EN-TÊTE ---
 st.title("🕯️ Student Lighthouse")
-st.markdown("*Guiding students before they drift away.*")
-
-# On crée les 3 onglets
-tab1, tab2, tab3 = st.tabs(["🎯 Triage", "📊 Model Lab", "📖 Method"])
+st.markdown("*Guiding students before they drift away. A decision-support tool for the Student Success Service.*")
+st.divider()
 
 # ==========================================
-# ONGLET 1 : TRIAGE (La carte étudiant)
+# BARRE LATÉRALE (Contrôles)
+# ==========================================
+with st.sidebar:
+    st.header("⚙️ Settings")
+    
+    st.markdown("**Service Capacity**")
+    capacity = st.slider("Number of students we can contact:", min_value=50, max_value=500, value=200, step=50)
+    
+    # Calcul dynamique du seuil
+    probs_train = cross_val_predict(model, X_train, y_train, cv=5, method="predict_proba", n_jobs=-1)[:, 1]
+    sorted_probs = sorted(probs_train, reverse=True)
+    threshold = sorted_probs[capacity - 1]
+    
+    st.info(f"Current Threshold: **{threshold:.4f}**")
+    
+    st.markdown("---")
+    st.markdown("**Student Profile**")
+    scenario = st.radio("Choose a profile to simulate:", ["Low Risk Profile", "High Risk Profile"])
+    file_name = "new_case.json" if scenario == "Low Risk Profile" else "high_risk_case.json"
+    
+    st.markdown("---")
+    st.caption("Built for the ML × Python final project (aivancity, PGE 2).")
+
+# ==========================================
+# ONGLETS
+# ==========================================
+tab1, tab2, tab3 = st.tabs(["🎯 Triage Simulator", "📊 Model Lab", "📖 Methodology"])
+
+# ==========================================
+# ONGLET 1 : TRIAGE
 # ==========================================
 with tab1:
-    st.header("Student Card Simulation")
-    st.markdown("Select a scenario to see the model's decision and the main signals.")
+    st.header("Student Card")
+    st.markdown("This is what the advisor sees when the model evaluates a student.")
     
-    # Menu déroulant pour choisir un scénario
-    scenario = st.radio("Choose a student profile:", ["Low Risk Student", "High Risk Student"])
+    # Chargement du profil
+    with open(file_name, "r") as f:
+        student_data = json.load(f)
+        
+    # Prédiction
+    prob = model.predict_proba(pd.DataFrame([student_data]))[0, 1]
+    is_risk = prob >= threshold
+    signals = get_top_signals(model, pd.DataFrame([student_data]))
     
-    # On charge le bon fichier JSON
-    if scenario == "Low Risk Student":
-        with open("new_case.json", "r") as f:
-            student_data = json.load(f)
-    else:
-        with open("high_risk_case.json", "r") as f:
-            student_data = json.load(f)
-            
-    # On fait la prédiction
-    probs = model.predict_proba(pd.DataFrame([student_data]))[0, 1]
-    threshold = 0.9927
+    # Rendu HTML de la carte
+    card_class = "glass-card-high" if is_risk else "glass-card-low"
+    status_text = "🚨 HIGH RISK" if is_risk else "✅ LOW RISK"
+    action_text = "Contact this student this week." if is_risk else "No immediate action required."
     
-    # Affichage de la carte
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric(label="Risk Score", value=f"{probs:.2%}")
-        if probs >= threshold:
-            st.error("**Status: HIGH RISK**\n\nAction: Contact this student this week.")
-        else:
-            st.success("**Status: LOW RISK**\n\nAction: No immediate action required.")
-            
-    with col2:
-        st.info("**Main Signals**")
-        # On récupère les signaux depuis predict.py (on simplifie l'appel)
-        from lighthouse.predict import get_top_signals
-        signals = get_top_signals(model, pd.DataFrame([student_data]))
-        for s in signals:
-            st.write(f"- {s}")
-
-    st.divider()
-    st.markdown("**Why this matters:** The model does not just say yes/no. It tells the advisor *why* this student needs help, making the decision actionable and fair.")
+    # Construction des badges HTML
+    badges_html = "".join([f'<span class="signal-badge">🔹 {sig}</span>' for sig in signals])
+    
+    st.markdown(f"""
+    <div class="glass-card {card_class}">
+        <h2 class="risk-title">{status_text}</h2>
+        <p class="risk-score">{prob:.1%}</p>
+        <p style="color: #aaa; margin-top: 0;">Risk Score</p>
+        <hr style="border-color: rgba(255,255,255,0.1);">
+        <p><b>Action:</b> {action_text}</p>
+        <p><b>Main Signals:</b></p>
+        <div>{badges_html}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ==========================================
-# ONGLET 2 : MODEL LAB (Pour le prof)
+# ONGLET 2 : MODEL LAB
 # ==========================================
 with tab2:
     st.header("Model Performance & Interpretation")
-    st.markdown("This tab is for the data scientists. It shows the model's quality and how it makes decisions.")
-    
-    # Courbes ROC et PR
-    col1, col2 = st.columns(2)
+    st.markdown("For the data scientists: statistical quality and global feature importance.")
     
     probs_test = model.predict_proba(X_test)[:, 1]
+    
+    col1, col2 = st.columns(2)
+    
+    # On force le fond sombre pour Matplotlib
+    plt.rcParams.update({
+        "figure.facecolor": "#0e1117",
+        "axes.facecolor": "#0e1117",
+        "text.color": "#fafafa",
+        "axes.labelcolor": "#fafafa",
+        "xtick.color": "#fafafa",
+        "ytick.color": "#fafafa",
+        "axes.edgecolor": "#333"
+    })
     
     with col1:
         st.subheader("ROC Curve")
         fpr, tpr, _ = roc_curve(y_test, probs_test)
         roc_auc = auc(fpr, tpr)
-        fig, ax = plt.subplots()
-        ax.plot(fpr, tpr, color="darkorange", lw=2, label=f"AUC = {roc_auc:.3f}")
-        ax.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.plot(fpr, tpr, color="#ff4b4b", lw=3, label=f"AUC = {roc_auc:.3f}")
+        ax.plot([0, 1], [0, 1], color="gray", lw=1, linestyle="--")
         ax.set_xlabel("False Positive Rate")
         ax.set_ylabel("True Positive Rate")
-        ax.legend(loc="lower right")
+        ax.legend(loc="lower right", facecolor="#0e1117", edgecolor="#333")
         st.pyplot(fig)
         
     with col2:
         st.subheader("Precision-Recall Curve")
         precision, recall, _ = precision_recall_curve(y_test, probs_test)
-        fig2, ax2 = plt.subplots()
-        ax2.plot(recall, precision, color="green", lw=2)
+        fig2, ax2 = plt.subplots(figsize=(6, 4))
+        ax2.plot(recall, precision, color="#00cc96", lw=3)
         ax2.set_xlabel("Recall")
         ax2.set_ylabel("Precision")
         ax2.set_title("Average Precision (PR-AUC)")
         st.pyplot(fig2)
         
     st.divider()
-    
-    # Coefficients du modèle
     st.subheader("Top 10 Most Influential Features")
     st.markdown("Positive values increase dropout risk. Negative values decrease it.")
     
@@ -123,38 +204,29 @@ with tab2:
     classifier = model.named_steps["model"]
     feature_names = preprocessor.get_feature_names_out()
     
-    # On nettoie les noms pour l'affichage
     clean_names = [name.replace("num__", "").replace("cat__", "") for name in feature_names]
-    
-    # On crée un DataFrame pour le graphique
-    coef_df = pd.DataFrame({
-        "Feature": clean_names,
-        "Coefficient": classifier.coef_[0]
-    })
-    # On trie par valeur absolue (les plus influents en premier)
+    coef_df = pd.DataFrame({"Feature": clean_names, "Coefficient": classifier.coef_[0]})
     coef_df["Abs"] = coef_df["Coefficient"].abs()
     coef_df = coef_df.sort_values("Abs", ascending=False).head(10)
     
-    st.bar_chart(data=coef_df, x="Feature", y="Coefficient", color="Feature")
+    # On utilise le bar_chart natif de Streamlit (qui s'adapte au thème sombre)
+    st.bar_chart(data=coef_df, x="Feature", y="Coefficient", color="#ff4b4b")
 
 # ==========================================
-# ONGLET 3 : METHOD (Explications)
+# ONGLET 3 : METHODOLOGY
 # ==========================================
 with tab3:
     st.header("Methodology & Design Choices")
-    
     st.markdown("""
     ### 1. The Problem
-    This tool supports the **Student Success Service**. It does not automate decisions. It prioritizes which students to call first, given a limited capacity of **200 appointments per semester**.
+    The university's student success service can only contact **200 students per semester**. This tool prioritizes who to call first to maximize the impact of the advisor's time.
     
-    ### 2. Data & Leakage
-    We used the UCI dataset *Predict Students' Dropout and Academic Success*.
-    **Crucial choice:** We removed all columns from the **2nd semester**. Why? Because at the moment we want to act (end of 1st semester), these data do not exist yet. Using them would be cheating (leakage) and make the tool useless in production.
+    ### 2. Temporal Leakage (The most important choice)
+    We removed all columns from the **2nd semester**. Why? Because at the moment we want to act (end of the 1st semester), these data do not exist yet. Keeping them would be cheating (leakage) and would make the tool useless in production.
     
     ### 3. The Metric
-    We do not use Accuracy. A model that says "nobody drops out" is 68% accurate but catches zero students.
-    We use **Average Precision (PR-AUC)**, which measures how well we rank the most at-risk students. We also look at **Precision @ Top 200**: if we call 200 students, how many are truly at risk?
+    We do not use Accuracy. A model that says "nobody drops out" is 68% accurate but catches zero students. We use **Average Precision (PR-AUC)** and **Precision@K**, which measure how well we rank the most at-risk students.
     
     ### 4. The Model
-    We compared Logistic Regression, k-NN, and Linear SVM under the same cross-validation. Logistic Regression won, and we chose it because it is **interpretable**: we can read the coefficients to show the advisor *why* a student is flagged.
+    We compared Logistic Regression, k-NN, and Linear SVM under the same cross-validation. Logistic Regression won (0.8556) and was chosen because it is **interpretable**: we can read the coefficients to show the advisor *why* a student is flagged.
     """)
