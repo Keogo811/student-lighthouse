@@ -14,6 +14,9 @@ Link: https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+acade
 
 We recommend using a virtual environment.
 
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
 """ 1-#On Terminal or Bash:"""
 
 pip install -e .
