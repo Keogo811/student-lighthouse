@@ -18,7 +18,7 @@ This file records the trade-offs made during the project. Each choice lists the 
 - **Reason:** The dataset is imbalanced (~32% dropout). Accuracy is misleading (a dummy model gets 68%). We need a metric that evaluates ranking, because the service has a limited capacity of 200 slots.
 
 ## 4. Model Selection
-- **Choice:** Logistic Regression (C=1.0).
+- **Choice:** Logistic Regression.
 - **Alternative:** Linear SVM (0.8555 vs 0.8556).
 - **Reason:** The scores are statistically identical. Logistic Regression gives readable coefficients. We can explain *why* a student is flagged to the advisor (Student Card).
 
